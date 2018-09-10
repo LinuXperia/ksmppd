@@ -496,7 +496,7 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
         tm_tmp = gw_localtime(dlr_time);
         gw_strftime(submit_date_c_str, sizeof (submit_date_c_str), "%y%m%d%H%M%S", &tm_tmp);
 	if(dlr_parse_result == -1){
-		debug("ksmppd.dlr.smpp", 0, "[%s] DLR Parsing Failed. Please Report", octstr_get_cstr(smpp_esme->system_id));
+		error("ksmppd.dlr", 0, "[%s] DLR Parsing Failed for %s. Please Report", octstr_get_cstr(smpp_esme->system_id), octstr_get_cstr(msg->sms.msgdata));
 		tm_tmp = gw_localtime(msg->sms.time);
 		gw_strftime(done_date_c_str, sizeof (done_date_c_str), "%y%m%d%H%M%S", &tm_tmp);
 		if(dlr_done_date != NULL){
