@@ -305,7 +305,6 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
     int dlrtype, catenate;
     int dlr_state = 7; /* UNKNOWN */
     long dlr_time = -1;
-    
     Msg *dlr = NULL;
     char *text, *tmps, err[4] = {'0', '0', '0', '\0'};
     char submit_date_c_str[13] = {'\0'}, done_date_c_str[13] = {'\0'};
@@ -485,37 +484,31 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
                 dlr_status = octstr_imm("EXPIRED");
             }
         }
-
-
-        text = octstr_get_cstr(msg->sms.msgdata);
-
-        tmps = strstr(text, "err:");
-        if (tmps != NULL) {
-            /* we can't use 0-padding with %s, if this is really required,
-             * then convert the numeric string to a real integer. - st */
-            snprintf(err, sizeof (err), "%3.3s", tmps + (4 * sizeof (char)));
-            tmps = strstr(tmps, " ");
-            text = tmps ? tmps + (1 * sizeof (char)) : "";
-        }
-
-        tmps = strstr(text, "text:");
-        if (tmps != NULL) {
-            text = tmps + (5 * sizeof (char));
-        }
-        
-        tmp_str = octstr_create(text);
-        octstr_truncate(tmp_str, 12l);
-
+	Octstr *dlr_id = NULL;
+	Octstr *dlr_sub = NULL;
+	Octstr *dlr_dlvrd = NULL;
+	Octstr *dlr_submit_date = NULL;
+	Octstr *dlr_done_date = NULL;
+	Octstr *dlr_stat = NULL;
+	Octstr *dlr_err = NULL;
+	Octstr *dlr_text = NULL;
+	int dlr_parse_result = parse_dlr_short_message(msg->sms.msgdata, &dlr_id, &dlr_sub, &dlr_dlvrd, &dlr_submit_date, &dlr_done_date, &dlr_stat, &dlr_err, &dlr_text);
         tm_tmp = gw_localtime(dlr_time);
         gw_strftime(submit_date_c_str, sizeof (submit_date_c_str), "%y%m%d%H%M%S", &tm_tmp);
-
-        tm_tmp = gw_localtime(msg->sms.time);
-        gw_strftime(done_date_c_str, sizeof (done_date_c_str), "%y%m%d%H%M%S", &tm_tmp);
+	if(dlr_parse_result == -1){
+		debug("ksmppd.dlr.smpp", 0, "[%s] DLR Parsing Failed. Please Report", octstr_get_cstr(smpp_esme->system_id));
+		tm_tmp = gw_localtime(msg->sms.time);
+		gw_strftime(done_date_c_str, sizeof (done_date_c_str), "%y%m%d%H%M%S", &tm_tmp);
+		if(dlr_done_date != NULL){
+			octstr_destroy(dlr_done_date);
+		}
+		dlr_done_date = octstr_create(done_date_c_str);
+	}
 
         /* the msgids are in dlr->dlr_url as reported by Victor Luchitz */
         gwlist_destroy(parts, octstr_destroy_item);
         parts = octstr_split(dlr_url, octstr_imm(";"));
-        
+
         while ((msgid2 = gwlist_extract_first(parts)) != NULL) {
             pdu2 = smpp_pdu_create(deliver_sm, 0);
             debug("smpp.pdu.msg.to.pdu", 0, "SMPP[%s:%ld] Creating deliver_sm for message: %s sequence number %ld.", octstr_get_cstr(smpp_esme->system_id), smpp_esme->id, octstr_get_cstr(msgid2), pdu2->u.deliver_sm.sequence_number);
@@ -539,7 +532,7 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
                             dict_get(metadata, octstr_imm("network_error_code")));
                 }
             }
-            pdu2->u.deliver_sm.short_message = octstr_format("id:%S sub:001 dlvrd:%S submit date:%s done date:%s stat:%S err:%s text:%S", msgid2, dlvrd, submit_date_c_str, done_date_c_str, dlr_status, err, tmp_str);
+            pdu2->u.deliver_sm.short_message = octstr_format("id:%S sub:001 dlvrd:%S submit date:%s done date:%S stat:%S err:%S text:%S", msgid2, dlvrd, submit_date_c_str, dlr_done_date, dlr_stat, dlr_err, dlr_text);
             pdu2->u.deliver_sm.sm_length = octstr_len(pdu2->u.deliver_sm.short_message);
             octstr_destroy(msgid2);
             gwlist_append(pdulist, pdu2);
@@ -554,6 +547,14 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
         octstr_destroy(dlr_service);
         octstr_destroy(dlr_submit);
         octstr_destroy(dlr_url);
+        octstr_destroy(dlr_id);
+        octstr_destroy(dlr_sub);
+        octstr_destroy(dlr_dlvrd);
+        octstr_destroy(dlr_submit_date);
+        octstr_destroy(dlr_done_date);
+        octstr_destroy(dlr_stat);
+        octstr_destroy(dlr_err);
+        octstr_destroy(dlr_text);
         dict_destroy(metadata);
         return pdulist;
     } else {
@@ -947,4 +948,97 @@ Msg *smpp_data_sm_to_msg(SMPPEsme *smpp_esme, SMPP_PDU *pdu, long *reason)
 error:
     msg_destroy(msg);
     return NULL;
+}
+/**
+ * For Parsing short_message of DeliverSm For Dlr Data
+ * Input: short_message
+ * OutPut: id,sub, dlvrd, submit date, done date, stat, err, text
+ * id:%S sub:001 dlvrd:%S submit date:%s done date:%s stat:%S err:%s text:%S
+ */
+
+int parse_dlr_short_message(const Octstr *short_message, Octstr **id, Octstr **sub, Octstr **dlvrd, Octstr **submit_date, Octstr **done_date, Octstr **stat, Octstr **err, Octstr **text){
+	if(short_message == NULL || octstr_len(short_message) == 0){
+		return -1;
+	}
+	long curr = 0, vpos = 0;
+	char id_cstr[65]={0x00}, stat_cstr[16]={0x00}, sub_d_cstr[15]={0x00}, done_d_cstr[15]={0x00};
+	char err_cstr[4]={0x00}, sub_cstr[4]={0x00}, dlvrd_cstr[4]={0x00};
+	int sub_int, dlvrd_int, ret, err_int;
+	ret = sscanf(octstr_get_cstr(short_message),
+			"id:%64[^ ] sub:%3[^ ] dlvrd:%3[^ ] submit date:%14[0-9] done "
+			"date:%14[0-9] stat:%15[^ ] err:%3[^ ]",
+			id_cstr, sub_cstr, dlvrd_cstr, sub_d_cstr, done_d_cstr,
+			stat_cstr, err_cstr);
+	if (ret == 7) {
+		/* only if not already here */
+		*id = octstr_create(id_cstr);
+		*sub = octstr_create(sub_cstr);
+		*dlvrd = octstr_create(dlvrd_cstr);
+		*submit_date = octstr_create(sub_d_cstr);
+		*done_date = octstr_create(done_d_cstr);
+		*stat = octstr_create(stat_cstr);
+		*err = octstr_create(err_cstr);
+	} else {
+		debug("ksmppd.dlr.smpp", 0, "Could not parse DLR string sscanf way, "
+				"fallback to old way. Please report!");
+
+		if ((curr = octstr_search(short_message, octstr_imm("id:"), 0)) != -1) {
+			if ((vpos = octstr_search_char(short_message, ' ', curr)) == -1)
+				vpos = octstr_len(short_message);
+			if (vpos-curr > 0)
+				*id = octstr_copy(short_message, curr+3, vpos-curr-3);
+		}
+		if ((curr = octstr_search(short_message, octstr_imm("sub:"), 0)) != -1) {
+			if ((vpos = octstr_search_char(short_message, ' ', curr)) == -1)
+				vpos = octstr_len(short_message);
+			if (vpos-curr > 0)
+				*sub = octstr_copy(short_message, curr+4, vpos-curr-4);
+		}
+		if ((curr = octstr_search(short_message, octstr_imm("dlvrd:"), 0)) != -1) {
+			if ((vpos = octstr_search_char(short_message, ' ', curr)) == -1)
+				vpos = octstr_len(short_message);
+			if (vpos-curr > 0)
+				*dlvrd = octstr_copy(short_message, curr+6, vpos-curr-6);
+		}
+		if ((curr = octstr_search(short_message, octstr_imm("submit date:"), 0)) != -1) {
+			if ((vpos = octstr_search_char(short_message, ' ', curr)) == -1)
+				vpos = octstr_len(short_message);
+			if (vpos-curr > 0)
+				*submit_date = octstr_copy(short_message, curr+12, vpos-curr-12);
+		}
+		if ((curr = octstr_search(short_message, octstr_imm("done date:"), 0)) != -1) {
+			if ((vpos = octstr_search_char(short_message, ' ', curr)) == -1)
+				vpos = octstr_len(short_message);
+			if (vpos-curr > 0)
+				*done_date = octstr_copy(short_message, curr+10, vpos-curr-10);
+		}
+
+		/* get err & status code */
+		if ((curr = octstr_search(short_message, octstr_imm("stat:"), 0)) != -1) {
+			if ((vpos = octstr_search_char(short_message, ' ', curr)) == -1)
+				vpos = octstr_len(short_message);
+			if (vpos-curr > 0)
+				*stat = octstr_copy(short_message, curr+5, vpos-curr-5);
+		}
+		if ((curr = octstr_search(short_message, octstr_imm("err:"), 0)) != -1) {
+			if ((vpos = octstr_search_char(short_message, ' ', curr)) == -1)
+				vpos = octstr_len(short_message);
+			if (vpos-curr > 0)
+				*err = octstr_copy(short_message, curr+4, vpos-curr-4);
+		}
+	}
+	if ((curr = octstr_case_search(short_message, octstr_imm("text:"), 0)) != -1) {
+		if ((vpos = octstr_search_char(short_message, '\0', curr)) == -1)
+			vpos = octstr_len(short_message);
+		if (vpos-curr > 0)
+			*text = octstr_copy(short_message, curr+5, vpos-curr-5);
+	}
+	if(*text == NULL || octstr_len(*text)==0){
+		*text = octstr_create("");
+	}
+	if(*id == NULL || *sub == NULL || *dlvrd == NULL || *submit_date == NULL || *done_date == NULL || *stat == NULL || *err == NULL || *text == NULL){
+		return -1;
+	}else{
+		return 0;
+	}
 }
