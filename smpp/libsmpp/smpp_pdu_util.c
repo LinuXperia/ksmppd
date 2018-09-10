@@ -1042,3 +1042,25 @@ int parse_dlr_short_message(const Octstr *short_message, Octstr **id, Octstr **s
 		return 0;
 	}
 }
+
+time_t smpp_time_to_unix_time(const char *smpp_time_cstr){
+       char year[3]={0};
+       char month[3]={0};
+       char day[3]={0};
+       char hour[3]={0};
+       char minute[3]={0};
+       char sec[3]={0};
+       sscanf(smpp_time_cstr, "%2s%2s%2s%2s%2s%2s", year, month, day, hour, minute, sec  );
+       time_t rawtime=0;
+       struct tm timeinfo={0x00};
+       time(&rawtime);
+       localtime_r(&rawtime, &timeinfo);
+       /* This Logic will work from 2000 to 2099 year*/
+       timeinfo.tm_year = (atoi(year) > 0) ? atoi(year)+2000-1900 : timeinfo.tm_year;
+       timeinfo.tm_mon =  (atoi(month) > 0) ? atoi(month)-1: timeinfo.tm_mon;
+       timeinfo.tm_mday = (atoi(day) > 0) ? atoi(day): timeinfo.tm_mday;
+       timeinfo.tm_hour = (atoi(hour) > 0) ? atoi(hour): timeinfo.tm_hour;
+       timeinfo.tm_min = (atoi(minute) > 0) ? atoi(minute): timeinfo.tm_min;
+       timeinfo.tm_sec = (atoi(sec) > 0) ? atoi(sec): timeinfo.tm_sec;
+       return gw_mktime ( &timeinfo );
+}
