@@ -72,7 +72,8 @@ extern "C" {
     Octstr *smpp_pdu_get_system_id_from_dlr_url(Octstr *received_dlr_url);
     List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg);
 
-
+    time_t smpp_time_to_c_time(const char *smpp_time_cstr);
+    int parse_dlr_short_message(Octstr *short_message, Octstr **id, unsigned int *sub, unsigned int *dlvrd, time_t *submit_date, time_t *done_date, Octstr **stat, unsigned int *err, Octstr **text);
 #ifdef __cplusplus
 }
 #endif
