@@ -1,0 +1,34 @@
+env:
+  global:
+  - secure: fYS0dVkULiVGJCJ-biVX8g
+  - secure: S3lfb60tbzzKiGx0ig0hCxWgs0m04D6m8WKTCoRBV89HvNawAB317GXyt6aprbGDYujfOCP18q2ztQVHh/pEfDRm0Dd1z8dLaAtZ7MNP76/t4kCQlAOfY1XH+74/GfX2finM58PswnbzvGlpdrMR8EYMyrhmmpSLiPY3nZyNqts7gHQvyce3SbWwTuN9oKtk8jhkOWmUoveO/zpwowhnloBA3T7wybFrAwYOWAcdCfoWxDlLQ4OG0oWGz6QX4dytiQMmt76/InONjx8pX9BBq+jEKErmwdp9PKQsVRvDtB7p1IwYpAI0ee65vma+vX53g2zY7M5jK2IEsyTK1imSAczLtDh0gRiEi02G0RqqKXQeb/oaMSrHdMjB0imdKq5G28U6agosCrIkckAKYMs/P0Kj0VKAsnEfMEot87/mv8V+G6RjaRJZ0K8IG59vZJ1KxCdJ8INnJ39OnqAPFltsYxtvd5U2HaobviGtFfuQa7cDlbF5kDVN1HyyCs3FzvO4ww5ZAKjuXf/Z8OGkyH0KjtY89ezJcQcIOayGhw9g51ULJjljePinNNF8eoejICbmgQ5VlPIpcGpLWDKxGSRZGLop77nK+t6DQDhsgDy7UAn/KAww8moOzHFuWzjo/HEclHunlqflnN1tqHKiJpkNd6uvtVm/elXeYxgTzRQ10QE=
+language: cpp
+install:
+- sudo apt-get update
+- sudo apt-get install g++ libtool shtool autoconf automake libmysqlclient-dev exuberant-ctags
+  libevent-dev kannel-dev kannel-extras pkg-config make git
+- if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
+compiler: gcc
+os: linux
+sudo: required
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - gcc-4.8
+    - g++-4.8
+  coverity_scan:
+    project:
+      name: rajesh6115/ksmppd
+      description: Build submitted via Travis CI
+    notification_email: sahoorajesh.d@gmail.com
+    build_command_prepend: autoreconf -i && ./configure && make clean
+    build_command: make
+    branch_pattern: coverity_scan
+before_script:
+- autoreconf -iv
+script: autoreconf -i && ./configure && make
+branches:
+  only:
+  - coverity_scan
