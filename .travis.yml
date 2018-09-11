@@ -23,12 +23,14 @@ addons:
       name: rajesh6115/ksmppd
       description: Build submitted via Travis CI
     notification_email: sahoorajesh.d@gmail.com
-    build_command_prepend: autoreconf -i && ./configure && make clean
-    build_command: make
+    build_command_prepend: "autoreconf -i && ./configure && make clean"
+    build_command: "make -j2"
     branch_pattern: coverity_scan
 before_script:
 - autoreconf -iv
-script: autoreconf -i && ./configure && make
+- ./configure
+script:
+- make -j2
 branches:
   only:
   - coverity_scan
