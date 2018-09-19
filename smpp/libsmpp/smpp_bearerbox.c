@@ -446,7 +446,6 @@ void smpp_bearerbox_inbound_thread(void *arg) {
                    smpp_bearerbox_msg = dict_remove(smpp_bearerbox->open_acks, ack_id);
                    if(smpp_bearerbox_msg) {
                        smpp_bearerbox_msg->callback(smpp_bearerbox_msg->context, SMPP_ESME_RSYSERR);
-                   }else{
                        smpp_bearerbox_msg_destroy(smpp_bearerbox_msg);
 		   }
                    octstr_destroy(ack_id);
