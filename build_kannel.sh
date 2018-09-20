@@ -12,7 +12,7 @@ make
 make install
 cd ..
 wget --no-check-certificate  https://redmine.kannel.org/attachments/download/322/gateway-1.4.5.tar.gz
-tar -xvzf gateway-1.4.5
+tar -xvzf gateway-1.4.5.tar.gz
 ./configure --with-mysql --with-redis --enable-shared
 make
 make install
