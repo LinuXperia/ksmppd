@@ -23,14 +23,14 @@ addons:
       description: Build submitted via Travis CI
     notification_email: sahoorajesh.d@gmail.com
     build_command_prepend: "autoreconf -i && ./configure && make clean"
-    build_command: "make -j2"
+    build_command: "make"
     branch_pattern: coverity_scan
 before_script:
 - sudo ./build_kannel.sh
 - autoreconf -iv
 - ./configure
 script:
-- make -j2
+- make
 branches:
   only:
   - coverity_scan
