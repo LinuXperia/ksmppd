@@ -5,8 +5,7 @@ env:
 language: cpp
 install:
 - sudo apt-get update
-- sudo apt-get install g++ libtool shtool autoconf automake libmysqlclient-dev exuberant-ctags
-  libevent-dev kannel-dev kannel-extras pkg-config make git
+- sudo apt-get install g++ libtool shtool autoconf automake libmysqlclient-dev exuberant-ctags libevent-dev pkg-config make git
 - if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
 compiler: gcc
 os: linux
@@ -27,6 +26,7 @@ addons:
     build_command: "make -j2"
     branch_pattern: coverity_scan
 before_script:
+- sudo ./build_kannel.sh
 - autoreconf -iv
 - ./configure
 script:
